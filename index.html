@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8fbff" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="体組成" />
+  <link rel="manifest" href="manifest.json" />
+  <title>体組成ダッシュボード</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root{
+      --bg:#eef3fb; --bg2:#f8fbff; --card:rgba(255,255,255,.9); --line:#dbe5f2;
+      --text:#172033; --muted:#6b7280; --primary:#3b82f6; --primary2:#60a5fa;
+      --good:#059669; --warn:#d97706; --bad:#dc2626; --shadow:0 14px 35px rgba(31,55,90,.10);
+    }
+    body.dark{--bg:#07111f;--bg2:#0b1220;--card:#111c2d;--line:#314158;--text:#f3f7fc;--muted:#b6c2d1;--primary:#67a6ff;--primary2:#4d8ff2;--good:#5ee4b4;--warn:#ffd166;--bad:#ff8585;--shadow:0 16px 36px rgba(0,0,0,.38)}
+    body.dark{background:radial-gradient(circle at top left,#16305f 0%,transparent 34%),radial-gradient(circle at top right,#18213b 0%,transparent 28%),linear-gradient(180deg,#0b1220,#07111f)}
+    body.dark .shell{background:#0c1626;border-color:#28364b}
+    body.dark .upload-card,body.dark .card,body.dark .mini{background:#111c2d;border-color:#314158}
+    body.dark .dropzone{background:linear-gradient(180deg,#132238,#0e192a);border-color:#5d8fca}
+    body.dark .avg-stat,body.dark .seg{background:#162338;border-color:#334862}
+    body.dark .seg button{color:#c6d2e2}
+    body.dark .seg button.active{background:#26364d;color:#dcebff;box-shadow:0 2px 10px rgba(0,0,0,.28)}
+    body.dark input[type=number]{background:#0a1424;color:#f4f7fb;border-color:#3b4d68}
+    body.dark input[type=number]::placeholder{color:#7f90a7}
+    body.dark th{background:#162235;color:#f0f5fb}
+    body.dark td{color:#e0e7f0}
+    body.dark th,body.dark td{border-bottom-color:#28384e}
+    body.dark .empty{background:#101c2e;border-color:#3a4d68;color:#c7d2e1}
+    body.dark .insight-text{color:#dce5ef}
+    body.dark .kpi-label,body.dark .kpi-change,body.dark .avg-label,body.dark .mini-title,body.dark .small,body.dark .subtitle,body.dark .footer{color:#b8c5d5}
+    body.dark .chart-title,body.dark .avg h2,body.dark .insight h2,body.dark .drop-title,body.dark h1{color:#f7fbff}
+    body.dark .theme-toggle{background:#1a2940;color:#f4f8fd;border-color:#425775}
+    body.dark #clearSavedButton{background:#1b2a40 !important;color:#dfe8f3 !important;border:1px solid #3a4c66}
+    body.dark .badge.good{background:#11352c;color:#73efbf}
+    body.dark .badge.warn{background:#3b3014;color:#ffe08a}
+    body.dark .badge.bad{background:#3a1c24;color:#ffabab}
+    .theme-toggle{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;padding:9px 13px;font-weight:800;cursor:pointer}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
+      background:radial-gradient(circle at top left,#dbeafe 0%,transparent 35%),linear-gradient(180deg,var(--bg2),var(--bg));
+      color:var(--text);min-height:100vh}
+    .app{max-width:1180px;margin:0 auto;padding:18px 14px 48px}
+    .shell{background:rgba(255,255,255,.48);border:1px solid rgba(255,255,255,.65);box-shadow:var(--shadow);
+      border-radius:32px;padding:16px;backdrop-filter:blur(12px)}
+    h1{margin:0;font-size:clamp(25px,4vw,40px);letter-spacing:-.04em}.subtitle{margin:6px 0 14px;color:var(--muted);font-size:14px}
+    .upload-card,.card{background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow)}
+    .upload-card{padding:16px;margin-bottom:14px}.upload-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:14px}
+    .dropzone{min-height:180px;border:2px dashed #bfd3ef;border-radius:22px;background:linear-gradient(180deg,#f8fbff,#eef5ff);
+      display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;transition:.2s}
+    .dropzone.drag{border-color:var(--primary);background:#eaf2ff}.drop-inner{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
+    .icon{width:58px;height:58px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff;font-size:28px}
+    .drop-title{font-size:18px;font-weight:800}.small{font-size:12px;color:var(--muted);line-height:1.5}
+    button{font:inherit}.btn{border:0;border-radius:999px;padding:11px 16px;font-weight:800;cursor:pointer}
+    .btn:disabled{opacity:.72;cursor:default}.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff}
+    .side{display:grid;gap:10px}.mini{background:rgba(255,255,255,.75);border:1px solid var(--line);border-radius:20px;padding:14px}
+    .mini-title{font-size:12px;color:var(--muted);font-weight:800;margin-bottom:8px}
+    .seg{display:inline-flex;gap:4px;padding:4px;background:#edf3fb;border:1px solid var(--line);border-radius:999px;flex-wrap:wrap}
+    .seg button{border:0;background:transparent;border-radius:999px;padding:8px 13px;font-size:13px;font-weight:800;cursor:pointer}
+    .seg button.active{background:#fff;color:var(--primary);box-shadow:0 2px 8px rgba(0,0,0,.07)}
+    .goal-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.goal-item label{display:block;font-size:11px;color:var(--muted);font-weight:800;margin-bottom:5px}
+    input[type=number]{width:100%;border:1px solid var(--line);border-radius:13px;padding:10px 11px;font-size:16px;font-weight:750;background:#fff;color:var(--text)}
+    .dashboard{display:none}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px}
+    .kpi{padding:15px}.kpi-label{font-size:12px;color:var(--muted);font-weight:800}.kpi-value{font-size:26px;font-weight:850;margin-top:5px;letter-spacing:-.04em}.kpi-change{font-size:12px;color:var(--muted);margin-top:7px}
+    .averages{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.avg{padding:17px}.avg h2,.insight h2,.chart-title{font-size:16px;margin:0 0 12px}
+    .avg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.avg-stat{background:#f7fafe;border:1px solid #e6edf6;border-radius:16px;padding:12px}
+    .avg-label{font-size:11px;color:var(--muted);font-weight:800}.avg-value{font-size:21px;font-weight:850;margin-top:5px}
+    .insights{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;margin-bottom:12px}.insight{padding:17px}.insight-text{font-size:14px;line-height:1.7;color:#334155}
+    .badge{display:inline-block;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:850;margin-bottom:10px}.good{background:#ecfdf5;color:var(--good)}.warn{background:#fff7ed;color:var(--warn)}.bad{background:#fef2f2;color:var(--bad)}
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px}.chart-card{padding:15px;min-height:345px}.chart-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.chart-box{height:280px;position:relative}
+    .table-card{margin-top:12px;padding:15px;overflow:auto}table{width:100%;min-width:900px;border-collapse:collapse}th,td{padding:10px 12px;border-bottom:1px solid #edf2f7;font-size:13px;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}th{background:#fbfdff;color:#475569}
+    .empty{padding:50px 20px;border:1px dashed #c7d5ea;background:rgba(255,255,255,.65);border-radius:24px;text-align:center;color:var(--muted)}
+    .install{display:none;margin-top:10px}.footer{font-size:11px;color:var(--muted);text-align:center;margin-top:12px}
+    @media(max-width:1020px){.upload-grid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:780px){.avg-grid[style]{grid-template-columns:repeat(2,1fr)!important}.kpis{grid-template-columns:repeat(2,1fr)}.averages,.insights,.charts{grid-template-columns:1fr}.shell{padding:11px;border-radius:24px}.goal-row{grid-template-columns:1fr 1fr}.avg-grid{grid-template-columns:repeat(3,1fr)}}
+    @media(max-width:430px){.avg-grid[style]{grid-template-columns:1fr!important}.avg-grid{grid-template-columns:1fr}.goal-row{grid-template-columns:1fr}.kpi-value{font-size:23px}}
+  
+    .calorie-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:12px;margin-bottom:12px}
+    .calorie-form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:end}
+    .field label{display:block;font-size:11px;color:var(--muted);font-weight:800;margin-bottom:5px}
+    .field input{width:100%;border:1px solid var(--line);border-radius:13px;padding:10px 11px;font-size:15px;background:#fff;color:var(--text)}
+    .forecast-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .forecast-stat{background:#f7fafe;border:1px solid #e6edf6;border-radius:16px;padding:12px}
+    .forecast-label{font-size:11px;color:var(--muted);font-weight:800}
+    .forecast-value{font-size:20px;font-weight:850;margin-top:5px}
+    .cal-table{width:100%;min-width:560px;border-collapse:collapse}
+    .cal-table th,.cal-table td{padding:9px 10px;border-bottom:1px solid #edf2f7;font-size:12px;text-align:right}
+    .cal-table th:first-child,.cal-table td:first-child{text-align:left}
+    [data-theme="dark"] .field input{background:#182235;color:#f8fafc;border-color:#43506a}
+    [data-theme="dark"] .forecast-stat{background:#182235;border-color:#334155}
+    @media(max-width:900px){.calorie-grid{grid-template-columns:1fr}.calorie-form{grid-template-columns:1fr 1fr}.forecast-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:500px){.calorie-form{grid-template-columns:1fr}.forecast-grid{grid-template-columns:1fr 1fr}}
+
+  
+    [data-theme="dark"] .calorie-grid .card{
+      background:#121a2a;
+      border-color:#334155;
+    }
+    [data-theme="dark"] .calorie-grid h2,
+    [data-theme="dark"] .calorie-grid .forecast-value,
+    [data-theme="dark"] .calorie-grid td{
+      color:#f8fafc;
+    }
+    [data-theme="dark"] .calorie-grid .small,
+    [data-theme="dark"] .calorie-grid .forecast-label,
+    [data-theme="dark"] .calorie-grid .field label{
+      color:#cbd5e1;
+    }
+    [data-theme="dark"] .calorie-grid .field input{
+      background:#0f172a;
+      color:#f8fafc;
+      border-color:#475569;
+      box-shadow:none;
+    }
+    [data-theme="dark"] .calorie-grid .field input::placeholder{
+      color:#94a3b8;
+    }
+    [data-theme="dark"] .forecast-stat{
+      background:#182235;
+      border-color:#3b4a63;
+    }
+    [data-theme="dark"] .cal-table th{
+      background:#111827;
+      color:#e2e8f0;
+      border-bottom-color:#334155;
+    }
+    [data-theme="dark"] .cal-table td{
+      border-bottom-color:#263244;
+    }
+    .delete-cal-btn{
+      border:0;
+      border-radius:10px;
+      padding:6px 9px;
+      font-size:12px;
+      font-weight:800;
+      cursor:pointer;
+      background:#fee2e2;
+      color:#b91c1c;
+    }
+    [data-theme="dark"] .delete-cal-btn{
+      background:#3b1d24;
+      color:#fecaca;
+      border:1px solid #7f1d1d;
+    }
+
+  
+    [data-theme="dark"] #exportBackupButton,
+    [data-theme="dark"] #importBackupButton{
+      background:#243147 !important;
+      color:#f8fafc !important;
+      border:1px solid #475569;
+    }
+  
+    .calorie-pager{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap}
+    .calorie-pager .pager-info{font-size:12px;color:var(--muted);font-weight:700}
+    .pager-btn{border:1px solid var(--line);background:#eef2f7;color:#334155;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer}
+    .pager-btn:disabled{opacity:.45;cursor:default}
+    body.dark .pager-btn{background:#243147;color:#f8fafc;border-color:#475569}
+
+  
+    .edit-cal-btn{
+      border:0;
+      border-radius:10px;
+      padding:6px 9px;
+      font-size:12px;
+      font-weight:800;
+      cursor:pointer;
+      background:#dbeafe;
+      color:#1d4ed8;
+      margin-right:6px;
+    }
+    [data-theme="dark"] .edit-cal-btn{
+      background:#1e3a5f;
+      color:#bfdbfe;
+      border:1px solid #3b82f6;
+    }
+  
+    [data-theme="dark"] input[type="date"]{
+      background:#f8fafc !important;
+      color:#0f172a !important;
+      border:1px solid #94a3b8 !important;
+      color-scheme:light;
+      font-weight:700;
+    }
+    [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{
+      filter:none;
+      opacity:1;
+      cursor:pointer;
+    }
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-text,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-month-field,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-day-field,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-year-field{
+      color:#0f172a;
+      background:transparent;
+    }
+
+  
+    /* Dark mode: stronger contrast for date input */
+    [data-theme="dark"] input[type="date"]{
+      background:#ffffff !important;
+      color:#111827 !important;
+      border:2px solid #cbd5e1 !important;
+      box-shadow:0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 1px rgba(15,23,42,.04);
+      color-scheme:light !important;
+    }
+    [data-theme="dark"] input[type="date"]:focus{
+      outline:3px solid rgba(96,165,250,.35);
+      outline-offset:1px;
+      border-color:#60a5fa !important;
+    }
+    [data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{
+      filter:none !important;
+      opacity:1 !important;
+      background-color:#e2e8f0;
+      border-radius:8px;
+      padding:5px;
+      cursor:pointer;
+    }
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-text,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-month-field,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-day-field,
+    [data-theme="dark"] input[type="date"]::-webkit-datetime-edit-year-field{
+      color:#111827 !important;
+      -webkit-text-fill-color:#111827 !important;
+      background:transparent !important;
+    }
+
+    /* Dark mode: forecast section readability */
+    [data-theme="dark"] .calorie-grid .card{
+      background:#0f172a !important;
+      border-color:#475569 !important;
+    }
+    [data-theme="dark"] .calorie-grid h2{
+      color:#f8fafc !important;
+    }
+    [data-theme="dark"] .forecast-stat{
+      background:#1e293b !important;
+      border:1px solid #475569 !important;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+    }
+    [data-theme="dark"] .forecast-label{
+      color:#cbd5e1 !important;
+      font-size:12px;
+    }
+    [data-theme="dark"] .forecast-value{
+      color:#ffffff !important;
+      font-weight:900 !important;
+      text-shadow:0 1px 0 rgba(0,0,0,.25);
+    }
+    [data-theme="dark"] .calorie-grid .small{
+      color:#d1d5db !important;
+    }
+    [data-theme="dark"] .cal-table th{
+      background:#111827 !important;
+      color:#f8fafc !important;
+      border-bottom:1px solid #475569 !important;
+    }
+    [data-theme="dark"] .cal-table td{
+      color:#f1f5f9 !important;
+      border-bottom:1px solid #334155 !important;
+    }
+
+  
+    /* v32: Force readable dark forecast cards */
+    [data-theme="dark"] .forecast-grid .forecast-stat{
+      background:#1b2638 !important;
+      border:1px solid #52627a !important;
+      box-shadow:none !important;
+    }
+    [data-theme="dark"] .forecast-grid .forecast-stat .forecast-label{
+      color:#d7e0ec !important;
+      -webkit-text-fill-color:#d7e0ec !important;
+      opacity:1 !important;
+      font-weight:800 !important;
+    }
+    [data-theme="dark"] .forecast-grid .forecast-stat .forecast-value{
+      color:#ffffff !important;
+      -webkit-text-fill-color:#ffffff !important;
+      opacity:1 !important;
+      font-weight:900 !important;
+      text-shadow:none !important;
+    }
+
+    /* v32: Make the date field and calendar button clear in dark mode */
+    [data-theme="dark"] #calDate{
+      background:#182235 !important;
+      color:#ffffff !important;
+      -webkit-text-fill-color:#ffffff !important;
+      border:2px solid #64748b !important;
+      color-scheme:dark !important;
+    }
+    [data-theme="dark"] #calDate::-webkit-calendar-picker-indicator{
+      filter:invert(1) brightness(1.8) !important;
+      opacity:1 !important;
+      background:transparent !important;
+    }
+    [data-theme="dark"] #calDate::-webkit-datetime-edit,
+    [data-theme="dark"] #calDate::-webkit-datetime-edit-fields-wrapper,
+    [data-theme="dark"] #calDate::-webkit-datetime-edit-text,
+    [data-theme="dark"] #calDate::-webkit-datetime-edit-month-field,
+    [data-theme="dark"] #calDate::-webkit-datetime-edit-day-field,
+    [data-theme="dark"] #calDate::-webkit-datetime-edit-year-field{
+      color:#ffffff !important;
+      -webkit-text-fill-color:#ffffff !important;
+      opacity:1 !important;
+    }
+
+  
+    /* v32: definitive dark-mode overrides (actual theme uses body.dark) */
+    body.dark #calDate{
+      background:#ffffff !important;
+      color:#111827 !important;
+      -webkit-text-fill-color:#111827 !important;
+      border:2px solid #94a3b8 !important;
+      color-scheme:light !important;
+      font-weight:800 !important;
+    }
+    body.dark #calDate::-webkit-calendar-picker-indicator{
+      filter:none !important;
+      opacity:1 !important;
+      background:#e2e8f0 !important;
+      border-radius:8px !important;
+      padding:5px !important;
+      cursor:pointer !important;
+    }
+    body.dark #calDate::-webkit-datetime-edit,
+    body.dark #calDate::-webkit-datetime-edit-fields-wrapper,
+    body.dark #calDate::-webkit-datetime-edit-text,
+    body.dark #calDate::-webkit-datetime-edit-month-field,
+    body.dark #calDate::-webkit-datetime-edit-day-field,
+    body.dark #calDate::-webkit-datetime-edit-year-field{
+      color:#111827 !important;
+      -webkit-text-fill-color:#111827 !important;
+      opacity:1 !important;
+      background:transparent !important;
+    }
+
+    body.dark .forecast-grid .forecast-stat{
+      background:#1e293b !important;
+      border:1px solid #64748b !important;
+      box-shadow:none !important;
+    }
+    body.dark .forecast-grid .forecast-label{
+      color:#dbeafe !important;
+      -webkit-text-fill-color:#dbeafe !important;
+      opacity:1 !important;
+      font-weight:800 !important;
+    }
+    body.dark .forecast-grid .forecast-value{
+      color:#ffffff !important;
+      -webkit-text-fill-color:#ffffff !important;
+      opacity:1 !important;
+      font-weight:900 !important;
+      text-shadow:none !important;
+    }
+    body.dark .calorie-grid .small{
+      color:#cbd5e1 !important;
+      -webkit-text-fill-color:#cbd5e1 !important;
+      opacity:1 !important;
+    }
+
+  
+    .delete-family-btn{
+      margin-top:10px;
+      background:#fee2e2 !important;
+      color:#b91c1c !important;
+      border:1px solid #fecaca !important;
+      font-weight:800;
+    }
+    .delete-family-btn:hover{background:#fecaca !important}
+    body.dark .delete-family-btn{
+      background:#3f1d24 !important;
+      color:#fecaca !important;
+      border-color:#7f1d1d !important;
+    }
+
+  </style>
+</head>
+<body>
+<div class="app"><div class="shell">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><h1>体組成ダッシュボード <span style="font-size:12px;color:var(--muted);font-weight:700;vertical-align:middle">v32</span></h1><button type="button" id="themeToggle" class="theme-toggle">🌙 ダーク</button></div>
+  <div class="subtitle">同じ日の複数測定は日平均にまとめ、体重・体脂肪・筋肉・骨量を可視化します。</div>
+
+  <section class="upload-card">
+    <div class="upload-grid">
+      <div class="dropzone" id="dropZone">
+        <div class="drop-inner">
+          <div class="icon">↑</div>
+          <div class="drop-title">CSVファイルを読み込む</div>
+          <div class="small">ドラッグ＆ドロップ、またはボタンから選択してください。CSVはブラウザ内で処理されます。</div>
+          <button type="button" class="btn btn-primary" id="chooseButton">ファイルを選択</button>
+          <div class="small" id="fileName">ファイル未選択</div>
+          <input id="fileInput" type="file" accept=".csv,text/csv" hidden>
+        </div>
+      </div>
+      <div class="side">
+        <div class="mini" id="familyPanel" style="display:none">
+          <div class="mini-title">家族</div>
+          <div class="seg" id="familySwitcher"></div>
+          <div class="small" id="familyHint" style="margin-top:7px">選択した家族のデータだけを表示します。</div>
+          <button type="button" class="btn delete-family-btn" id="deleteFamilyButton">選択ユーザーを削除</button>
+        </div>
+        <div class="mini">
+          <div class="mini-title">表示期間</div>
+          <div class="seg" id="rangeSwitcher">
+            <button class="active" data-range="7">7日</button><button data-range="30">30日</button><button data-range="all">全期間</button>
+          </div>
+        </div>
+        <div class="mini">
+          <div class="mini-title">目標値</div>
+          <div class="goal-row">
+            <div class="goal-item"><label for="goalWeight">目標体重 (kg)</label><input id="goalWeight" type="number" step="0.1" placeholder="65.0"></div>
+            <div class="goal-item"><label for="goalFat">目標体脂肪率 (%)</label><input id="goalFat" type="number" step="0.1" placeholder="18.0"></div>
+          </div>
+        </div>
+        <div class="mini"><div class="mini-title">読み込み状況</div><div id="status" style="font-size:13px;line-height:1.55">CSVを選択してください。</div></div>
+        
+        <div class="mini">
+          <div class="mini-title">データ移行・バックアップ</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn" id="exportBackupButton" style="background:#e8eef8;color:#334155;">バックアップを書き出す</button>
+            <button type="button" class="btn" id="importBackupButton" style="background:#e8eef8;color:#334155;">バックアップを読み込む</button>
+            <input id="backupFileInput" type="file" accept=".json,application/json" hidden>
+          </div>
+          <div class="small" style="margin-top:8px">別のPC・スマホへ、体組成データ・目標値・家族設定・カロリー収支を移行できます。</div>
+        </div>
+
+        <button type="button" class="btn btn-primary install" id="installButton">ホーム画面に追加</button>
+        <button type="button" class="btn" id="clearSavedButton" style="background:#eef2f7;color:#475569;">保存データを削除</button>
+      </div>
+    </div>
+  </section>
+
+  <main id="dashboard" class="dashboard">
+    <section class="kpis">
+      <div class="card kpi"><div class="kpi-label">最新体重</div><div class="kpi-value" id="kpiWeight">-</div><div class="kpi-change" id="chgWeight">-</div></div>
+      <div class="card kpi"><div class="kpi-label">BMI</div><div class="kpi-value" id="kpiBMI">-</div><div class="kpi-change" id="chgBMI">-</div></div>
+      <div class="card kpi"><div class="kpi-label">体脂肪率</div><div class="kpi-value" id="kpiFat">-</div><div class="kpi-change" id="chgFat">-</div></div>
+      <div class="card kpi"><div class="kpi-label">筋肉量</div><div class="kpi-value" id="kpiMuscle">-</div><div class="kpi-change" id="chgMuscle">-</div></div>
+      <div class="card kpi"><div class="kpi-label">骨格筋量</div><div class="kpi-value" id="kpiSkeletal">-</div><div class="kpi-change" id="chgSkeletal">-</div></div>
+    </section>
+
+    <section class="averages">
+      <div class="card avg"><h2>直近7日平均</h2><div class="avg-grid">
+        <div class="avg-stat"><div class="avg-label">体重</div><div class="avg-value" id="w7">-</div></div>
+        <div class="avg-stat"><div class="avg-label">体脂肪率</div><div class="avg-value" id="f7">-</div></div>
+        <div class="avg-stat"><div class="avg-label">筋肉量</div><div class="avg-value" id="m7">-</div></div>
+      </div></div>
+      <div class="card avg"><h2>直近30日平均</h2><div class="avg-grid">
+        <div class="avg-stat"><div class="avg-label">体重</div><div class="avg-value" id="w30">-</div></div>
+        <div class="avg-stat"><div class="avg-label">体脂肪率</div><div class="avg-value" id="f30">-</div></div>
+        <div class="avg-stat"><div class="avg-label">筋肉量</div><div class="avg-value" id="m30">-</div></div>
+      </div></div>
+    </section>
+
+    
+    <section class="calorie-grid">
+      <div class="card avg">
+        <h2>カロリー収支入力</h2>
+        <div class="calorie-form">
+          <div class="field"><label for="calDate">日付</label><input id="calDate" type="date"></div>
+          <div class="field"><label for="activeCal">Apple Watch アクティブ消費 kcal</label><input id="activeCal" type="number" min="0" step="1" placeholder="例: 650"></div>
+          <div class="field"><label for="intakeCal">あすけん 摂取 kcal</label><input id="intakeCal" type="number" min="0" step="1" placeholder="例: 1900"></div>
+          <button type="button" class="btn btn-primary" id="saveCalorieButton">保存</button>
+        </div>
+        <div class="small" style="margin-top:10px">推定総消費＝最新の基礎代謝量＋Apple Watchのアクティブ消費として簡易計算します。</div>
+        <div style="overflow:auto;margin-top:10px">
+          <table class="cal-table"><thead><tr><th>日付</th><th>アクティブ消費</th><th>摂取</th><th>推定総消費</th><th>収支</th><th>操作</th></tr></thead><tbody id="calorieRows"></tbody></table>
+          <div class="calorie-pager">
+            <button type="button" class="pager-btn" id="caloriePrevButton">← 戻る</button>
+            <div class="pager-info" id="caloriePagerInfo">直近3件</div>
+            <button type="button" class="pager-btn" id="calorieNextButton">送る →</button>
+          </div>
+        </div>
+      </div>
+      <div class="card avg">
+        <h2>カロリー収支からの参考予測</h2>
+        <div class="forecast-grid">
+          <div class="forecast-stat"><div class="forecast-label">7日平均収支</div><div class="forecast-value" id="bal7">-</div></div>
+          <div class="forecast-stat"><div class="forecast-label">30日平均収支</div><div class="forecast-value" id="bal30">-</div></div>
+          <div class="forecast-stat"><div class="forecast-label">1週間のカロリー収支</div><div class="forecast-value" id="sumBal7">-</div></div>
+          <div class="forecast-stat"><div class="forecast-label">1カ月のカロリー収支</div><div class="forecast-value" id="sumBal30">-</div></div>
+          <div class="forecast-stat"><div class="forecast-label">7日後 予想体重</div><div class="forecast-value" id="predW7">-</div></div>
+          <div class="forecast-stat"><div class="forecast-label">30日後 予想体重</div><div class="forecast-value" id="predW30">-</div></div>
+          <div class="forecast-stat"><div class="forecast-label">7日後 予想体脂肪率</div><div class="forecast-value" id="predF7">-</div></div>
+          <div class="forecast-stat"><div class="forecast-label">30日後 予想体脂肪率</div><div class="forecast-value" id="predF30">-</div></div>
+          <div class="forecast-stat"><div class="forecast-label">7日後 予想脂肪量</div><div class="forecast-value" id="predFM7">-</div></div>
+          <div class="forecast-stat"><div class="forecast-label">30日後 予想脂肪量</div><div class="forecast-value" id="predFM30">-</div></div>
+        </div>
+        <div class="small" style="margin-top:10px;line-height:1.55">参考値です。体重は約7,700kcal＝1kg、体脂肪率は体重変化の75%が脂肪由来と仮定して計算します。</div>
+      </div>
+    </section>
+
+    <section class="insights">
+      <div class="card insight"><h2>体重減少と筋肉量の判定</h2><div class="badge warn" id="muscleBadge">判定待ち</div><div class="insight-text" id="muscleText">測定データから簡易判定します。</div></div>
+      <div class="card insight"><h2>目標まで</h2><div class="insight-text" id="goalText">目標体重・目標体脂肪率を入力すると差を表示します。</div></div>
+    </section>
+
+
+    <section class="card avg" style="margin-bottom:12px">
+      <h2>詳細指標</h2>
+      <div class="avg-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="avg-stat"><div class="avg-label">水分量</div><div class="avg-value" id="dWater">-</div></div>
+        <div class="avg-stat"><div class="avg-label">体脂肪量</div><div class="avg-value" id="dFatMass">-</div></div>
+        <div class="avg-stat"><div class="avg-label">除脂肪体重</div><div class="avg-value" id="dLean">-</div></div>
+        <div class="avg-stat"><div class="avg-label">骨量</div><div class="avg-value" id="dBone">-</div></div>
+        <div class="avg-stat"><div class="avg-label">タンパク質</div><div class="avg-value" id="dProtein">-</div></div>
+        <div class="avg-stat"><div class="avg-label">皮下脂肪</div><div class="avg-value" id="dSubfat">-</div></div>
+        <div class="avg-stat"><div class="avg-label">体内年齢</div><div class="avg-value" id="dBodyAge">-</div></div>
+        <div class="avg-stat"><div class="avg-label">ボディタイプ</div><div class="avg-value" id="dBodyType" style="font-size:18px">-</div></div>
+        <div class="avg-stat"><div class="avg-label">筋肉率（計算値）</div><div class="avg-value" id="dMuscleRate">-</div></div>
+        <div class="avg-stat"><div class="avg-label">骨量率（計算値）</div><div class="avg-value" id="dBoneRate">-</div></div>
+      </div>
+    </section>
+
+    <section class="charts">
+      <div class="card chart-card"><div class="chart-head"><h2 class="chart-title">体重・除脂肪体重</h2><div class="small">目標体重ライン付き</div></div><div class="chart-box"><canvas id="weightChart"></canvas></div></div>
+      <div class="card chart-card"><div class="chart-head"><h2 class="chart-title">体脂肪率</h2><div class="small">目標体脂肪率ライン付き</div></div><div class="chart-box"><canvas id="fatChart"></canvas></div></div>
+      <div class="card chart-card"><h2 class="chart-title">BMI</h2><div class="chart-box"><canvas id="bmiChart"></canvas></div></div>
+      <div class="card chart-card"><h2 class="chart-title">筋肉量・骨格筋量</h2><div class="chart-box"><canvas id="muscleChart"></canvas></div></div>
+      <div class="card chart-card"><h2 class="chart-title">基礎代謝量</h2><div class="chart-box"><canvas id="bmrChart"></canvas></div></div>
+      <div class="card chart-card"><h2 class="chart-title">内臓脂肪</h2><div class="chart-box"><canvas id="visceralChart"></canvas></div></div>
+      <div class="card chart-card"><h2 class="chart-title">水分量・タンパク質</h2><div class="chart-box"><canvas id="compositionChart"></canvas></div></div>
+      <div class="card chart-card"><h2 class="chart-title">皮下脂肪・体脂肪量</h2><div class="chart-box"><canvas id="fatMassChart"></canvas></div></div>
+      <div class="card chart-card"><h2 class="chart-title">体内年齢</h2><div class="chart-box"><canvas id="ageChart"></canvas></div></div>
+    </section>
+
+    <section class="card table-card"><h2 class="chart-title">測定データ一覧</h2><table><thead><tr><th>日時</th><th>家族</th><th>体重</th><th>BMI</th><th>体脂肪率</th><th>筋肉量</th><th>筋肉率（計算値）</th><th>基礎代謝量</th><th>水分量</th><th>体脂肪量</th><th>除脂肪体重</th><th>骨量</th><th>骨量率（計算値）</th><th>内臓脂肪</th><th>タンパク質</th><th>骨格筋量</th><th>皮下脂肪</th><th>体内年齢</th><th>ボディタイプ</th></tr></thead><tbody id="rows"></tbody></table></section>
+  </main>
+
+  <div id="empty" class="empty">CSVを読み込むとダッシュボードが表示されます。</div>
+  <div class="footer">PWA対応・ブラウザ内処理</div>
+</div></div>
+
+<script>
+(() => {
+  const $=s=>document.querySelector(s), charts={}; let allRows=[], currentRange='7', cols={}, currentFamily=''; const THEME_KEY='body_dashboard_theme'; const FAMILY_KEY='body_dashboard_family'; const SAVED_DATA_KEY='body_composition_saved_data_v1'; const SAVED_FILE_KEY='body_composition_saved_filename_v1'; const CALORIE_KEY='body_composition_calorie_v1'; const CALORIE_DRAFT_KEY='body_composition_calorie_draft_v1'; let calorieData={}; let caloriePage=0; const CALORIE_PAGE_SIZE=3;
+  const aliases={
+    time:['時間','日時','日付','測定日時'],family:['家族'],weight:['体重 (kg)','体重'],bmi:['BMI'],fat:['体脂肪率 %','体脂肪率'],
+    muscle:['筋肉量 (kg)','筋肉量'],muscleRate:['筋肉率 %','筋肉率'],
+    bmr:['基礎代謝量','基礎代謝'],water:['水分量'],fatMass:['体脂肪量 (kg)','体脂肪量'],
+    lean:['除脂肪体重 (kg)','除脂肪体重'],bone:['骨量（kg） (kg)','骨量 (kg)','骨量'],
+    boneRate:['骨量（％） %','骨量率 %','骨量率'],visceral:['内臓脂肪'],protein:['タンパク質 %','タンパク質'],
+    skeletal:['骨格筋量 (kg)','骨格筋量'],subfat:['皮下脂肪 %','皮下脂肪率','皮下脂肪'],
+    bodyAge:['体内年齢'],bodyType:['ボディタイプ']
+  };
+  const norm=s=>String(s||'').trim().replace(/\s+/g,' ').toLowerCase();
+  const num=v=>{const n=parseFloat(String(v??'').replace(/,/g,'').replace(/[^\d.\-]/g,''));return Number.isFinite(n)?n:null};
+  const avg=a=>{const b=a.filter(v=>v!=null);return b.length?b.reduce((x,y)=>x+y,0)/b.length:null};
+  const pct=(part,total)=>{if(part==null||total==null||total===0)return null;return part/total*100};
+  const fmt=(v,u='')=>v==null?'-':`${v.toFixed(1)}${u}`;
+  const date=v=>{const d=new Date(String(v||'').replace(' ','T'));return Number.isNaN(d.getTime())?null:d};
+  const label=d=>new Intl.DateTimeFormat('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(d);
+
+  function applyTheme(theme){
+    const dark=theme==='dark';
+    document.body.classList.toggle('dark',dark);
+    $('#themeToggle').textContent=dark?'☀️ ライト':'🌙 ダーク';
+    const meta=document.querySelector('meta[name=theme-color]'); if(meta) meta.setAttribute('content',dark?'#0b1220':'#f8fbff');
+    localStorage.setItem(THEME_KEY,dark?'dark':'light');
+    if(allRows.length) render();
+  }
+  const savedTheme=localStorage.getItem(THEME_KEY);
+  if(savedTheme==='dark'||(!savedTheme&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)) applyTheme('dark');
+  else applyTheme('light');
+  $('#themeToggle').addEventListener('click',()=>applyTheme(document.body.classList.contains('dark')?'light':'dark'));
+
+  $('#chooseButton').onclick=()=>$('#fileInput').click();
+  $('#fileInput').onchange=e=>load(e.target.files[0]);
+  $('#caloriePrevButton').addEventListener('click',()=>{caloriePage++;renderCalorieTable();});
+  $('#calorieNextButton').addEventListener('click',()=>{caloriePage=Math.max(0,caloriePage-1);renderCalorieTable();});
+  ['dragenter','dragover'].forEach(ev=>$('#dropZone').addEventListener(ev,e=>{e.preventDefault();$('#dropZone').classList.add('drag')}));
+  ['dragleave','drop'].forEach(ev=>$('#dropZone').addEventListener(ev,e=>{e.preventDefault();$('#dropZone').classList.remove('drag')}));
+  $('#dropZone').addEventListener('drop',e=>load(e.dataTransfer.files[0]));
+
+  $('#rangeSwitcher').onclick=e=>{if(e.target.tagName!=='BUTTON')return;currentRange=e.target.dataset.range;
+    [...$('#rangeSwitcher').querySelectorAll('button')].forEach(b=>b.classList.toggle('active',b===e.target));render()};
+  const goalStorageKey=(id,family)=>`${id}__family__${encodeURIComponent(family||'default')}`;
+  function loadFamilyGoals(){
+    const family=currentFamily||'default';
+    ['goalWeight','goalFat'].forEach(id=>{
+      let value=localStorage.getItem(goalStorageKey(id,family));
+      if(value===null && !localStorage.getItem('body_dashboard_family_goals_migrated')) value=localStorage.getItem(id)||'';
+      $('#'+id).value=value||'';
+    });
+  }
+  function saveCurrentGoal(id){
+    localStorage.setItem(goalStorageKey(id,currentFamily||'default'),$('#'+id).value);
+    localStorage.setItem('body_dashboard_family_goals_migrated','1');
+  }
+  ['goalWeight','goalFat'].forEach(id=>{
+    $('#'+id).addEventListener('input',()=>{saveCurrentGoal(id);render()});
+  });
+
+  function familyName(r){
+    if(!cols.family) return '本人';
+    const v=String(r[cols.family]??'').trim();
+    return v || '本人';
+  }
+  function familyRows(){
+    if(!allRows.length) return [];
+    if(!cols.family) return allRows;
+    return allRows.filter(r=>familyName(r)===currentFamily);
+  }
+  function updateFamilySwitcher(){
+    if(!allRows.length) return;
+    const families=[...new Set(allRows.map(familyName))];
+    const panel=$('#familyPanel'), switcher=$('#familySwitcher');
+    if(families.length<=1){
+      currentFamily=families[0]||'本人';
+      panel.style.display='block';
+      switcher.innerHTML=families.length
+        ? `<button type="button" class="active" data-family="${String(currentFamily).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(currentFamily).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</button>`
+        : '';
+      localStorage.setItem(FAMILY_KEY,currentFamily);
+      loadFamilyGoals();
+      return;
+    }
+    panel.style.display='block';
+    const saved=localStorage.getItem(FAMILY_KEY);
+    if(!currentFamily || !families.includes(currentFamily)) currentFamily=(saved&&families.includes(saved))?saved:families[0];
+    switcher.innerHTML=families.map(f=>`<button type="button" data-family="${String(f).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${String(f).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</button>`).join('');
+    [...switcher.querySelectorAll('button')].forEach(b=>b.classList.toggle('active',b.dataset.family===currentFamily));
+    localStorage.setItem(FAMILY_KEY,currentFamily);
+    loadFamilyGoals();
+  }
+  $('#familySwitcher').addEventListener('click',e=>{
+    if(e.target.tagName!=='BUTTON') return;
+    currentFamily=e.target.dataset.family;
+    localStorage.setItem(FAMILY_KEY,currentFamily);
+    [...$('#familySwitcher').querySelectorAll('button')].forEach(b=>b.classList.toggle('active',b===e.target));
+    loadFamilyGoals();
+    render();
+  });
+
+  function deleteCurrentFamily(){
+    if(!allRows.length) return;
+
+    const target=currentFamily || familyName(allRows[0]);
+    if(!target) return;
+
+    const targetRows=allRows.filter(r=>familyName(r)===target).length;
+    const targetCalories=Object.keys(calorieData[target]||{}).length;
+
+    const ok=confirm(
+      `「${target}」のデータを削除しますか？\n\n`+
+      `・体組成データ: ${targetRows}件\n`+
+      `・カロリー収支: ${targetCalories}件\n`+
+      `・このユーザーの目標値\n\n`+
+      `この操作は元に戻せません。`
+    );
+    if(!ok) return;
+
+    // 選択ユーザーの体組成データだけ削除
+    allRows=allRows.filter(r=>familyName(r)!==target);
+
+    // 選択ユーザーのカロリー収支だけ削除
+    if(Object.prototype.hasOwnProperty.call(calorieData,target)){
+      delete calorieData[target];
+      saveCalorieStore();
+    }
+
+    // 選択ユーザーの目標値だけ削除
+    ['goalWeight','goalFat'].forEach(id=>{
+      localStorage.removeItem(goalStorageKey(id,target));
+    });
+
+    // このユーザー用の入力途中データがあれば削除
+    try{
+      const raw=localStorage.getItem(CALORIE_DRAFT_KEY);
+      if(raw){
+        const d=JSON.parse(raw)||{};
+        if(!d.family || d.family===target) localStorage.removeItem(CALORIE_DRAFT_KEY);
+      }
+    }catch(e){
+      localStorage.removeItem(CALORIE_DRAFT_KEY);
+    }
+
+    caloriePage=0;
+
+    if(allRows.length){
+      const families=[...new Set(allRows.map(familyName))];
+      currentFamily=families[0]||'本人';
+      localStorage.setItem(FAMILY_KEY,currentFamily);
+      saveMeasurementData();
+      updateFamilySwitcher();
+      loadFamilyGoals();
+      render();
+      $('#status').textContent=`「${target}」のデータを削除しました。残り ${allRows.length}件の測定データがあります。`;
+    }else{
+      // 最後のユーザーを削除した場合
+      localStorage.removeItem(SAVED_DATA_KEY);
+      localStorage.removeItem(SAVED_FILE_KEY);
+      localStorage.removeItem(FAMILY_KEY);
+      currentFamily='';
+      cols={};
+      $('#familyPanel').style.display='none';
+      $('#familySwitcher').innerHTML='';
+      Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});
+      $('#dashboard').style.display='none';
+      $('#empty').style.display='block';
+      $('#fileName').textContent='ファイル未選択';
+      $('#status').textContent=`「${target}」のデータを削除しました。CSVを選択してください。`;
+      renderCalorieTable();
+      renderCalorieForecast();
+    }
+  }
+
+  $('#deleteFamilyButton').addEventListener('click',deleteCurrentFamily);
+
+  function saveMeasurementData(){
+    try{
+      const payload={
+        cols,
+        rows:allRows.map(r=>{
+          const out={__date:r.__date.toISOString(),__raw:r.__raw};
+          for(const k of Object.keys(cols)){ if(k!=='time') out[cols[k]]=r[cols[k]]; }
+          return out;
+        })
+      };
+      localStorage.setItem(SAVED_DATA_KEY,JSON.stringify(payload));
+    }catch(e){
+      console.warn('測定データの保存に失敗しました',e);
+    }
+  }
+  function restoreMeasurementData(){
+    try{
+      const raw=localStorage.getItem(SAVED_DATA_KEY);
+      if(!raw)return false;
+      const saved=JSON.parse(raw);
+      if(!saved || !saved.cols || !Array.isArray(saved.rows) || !saved.rows.length)return false;
+      cols=saved.cols;
+      allRows=saved.rows.map(r=>{
+        const out={...r,__date:new Date(r.__date)};
+        if(Number.isNaN(out.__date.getTime())) return null;
+        if(cols.weight && cols.muscle){
+          if(!cols.muscleRate) cols.muscleRate='__calc_muscle_rate';
+          out[cols.muscleRate]=pct(out[cols.muscle],out[cols.weight]);
+        }
+        if(cols.weight && cols.bone){
+          if(!cols.boneRate) cols.boneRate='__calc_bone_rate';
+          out[cols.boneRate]=pct(out[cols.bone],out[cols.weight]);
+        }
+        return out;
+      }).filter(Boolean).sort((a,b)=>a.__date-b.__date);
+      if(!allRows.length)return false;
+      const savedName=localStorage.getItem(SAVED_FILE_KEY);
+      if(savedName) $('#fileName').textContent=savedName+'（保存データ）';
+      $('#status').textContent=`前回保存した ${allRows.length}件の測定データを復元しました。`;
+      updateFamilySwitcher();
+      render();
+      return true;
+    }catch(e){
+      console.warn('保存データの復元に失敗しました',e);
+      return false;
+    }
+  }
+  function clearSavedData(){
+    localStorage.removeItem(SAVED_DATA_KEY);
+    localStorage.removeItem(SAVED_FILE_KEY);
+    allRows=[]; cols={}; currentFamily='';
+    $('#familyPanel').style.display='none'; $('#familySwitcher').innerHTML='';
+    Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});
+    $('#dashboard').style.display='none';
+    $('#empty').style.display='block';
+    $('#fileName').textContent='ファイル未選択';
+    $('#status').textContent='保存した測定データを削除しました。CSVを選択してください。';
+  }
+
+  function currentFamilyKey(){
+    try{
+      if(typeof selectedFamily!=='undefined' && selectedFamily) return selectedFamily;
+      if(typeof currentFamily!=='undefined' && currentFamily) return currentFamily;
+    }catch(e){}
+    return 'default';
+  }
+  function getBackupPayload(){
+    const data={};
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key) continue;
+      if(
+        key.startsWith('body_') ||
+        key.startsWith('goal') ||
+        key.startsWith('selected') ||
+        key.startsWith('theme') ||
+        key.startsWith('body_composition')
+      ){
+        data[key]=localStorage.getItem(key);
+      }
+    }
+    return {
+      app:'body-composition-dashboard',
+      version:18,
+      exportedAt:new Date().toISOString(),
+      localStorage:data
+    };
+  }
+
+  function exportBackup(){
+    try{
+      const payload=getBackupPayload();
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      const stamp=new Date().toISOString().slice(0,10);
+      a.href=url;
+      a.download=`body-composition-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      if($('#status')) $('#status').textContent='バックアップを書き出しました。';
+    }catch(e){
+      alert('バックアップの書き出しに失敗しました。');
+    }
+  }
+
+  function importBackupFile(file){
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const payload=JSON.parse(reader.result);
+        if(!payload || payload.app!=='body-composition-dashboard' || !payload.localStorage){
+          throw new Error('このアプリのバックアップファイルではありません。');
+        }
+        const entries=Object.entries(payload.localStorage);
+        if(!entries.length) throw new Error('バックアップにデータがありません。');
+
+        if(!confirm('現在この端末に保存されているデータを、バックアップ内容で更新しますか？')){
+          return;
+        }
+
+        entries.forEach(([k,v])=>{
+          if(v===null || v===undefined) localStorage.removeItem(k);
+          else localStorage.setItem(k,String(v));
+        });
+
+        alert('バックアップを復元しました。画面を再読み込みします。');
+        location.reload();
+      }catch(e){
+        alert('バックアップを読み込めませんでした: '+e.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function loadCalorieStore(){try{calorieData=JSON.parse(localStorage.getItem(CALORIE_KEY)||'{}')||{};}catch(e){calorieData={};}}
+  function saveCalorieStore(){localStorage.setItem(CALORIE_KEY,JSON.stringify(calorieData));}
+  function saveCalorieDraft(){
+    const draft={date:$('#calDate')?.value||'',active:$('#activeCal')?.value||'',intake:$('#intakeCal')?.value||'',family:currentFamilyKey()};
+    localStorage.setItem(CALORIE_DRAFT_KEY,JSON.stringify(draft));
+  }
+  function restoreCalorieDraft(){
+    try{
+      const raw=localStorage.getItem(CALORIE_DRAFT_KEY); if(!raw)return;
+      const d=JSON.parse(raw)||{};
+      if(d.family && d.family!==currentFamilyKey()) return;
+      if($('#calDate') && d.date) $('#calDate').value=d.date;
+      if($('#activeCal') && d.active!=='') $('#activeCal').value=d.active;
+      if($('#intakeCal') && d.intake!=='') $('#intakeCal').value=d.intake;
+    }catch(e){}
+  }
+  function clearCalorieDraft(){localStorage.removeItem(CALORIE_DRAFT_KEY);}
+  function familyCalories(){const key=currentFamilyKey();return calorieData[key]||{};}
+  function latestBmr(){
+    const famRows=(typeof getFamilyRows==='function')?getFamilyRows():allRows;
+    const dr=(typeof dailyAverageRows==='function')?dailyAverageRows(famRows):famRows;
+    const latest=dr.length?dr[dr.length-1]:null;
+    return latest&&cols.bmr?latest[cols.bmr]:null;
+  }
+  function saveCalorieEntry(){
+    const d=$('#calDate').value;
+    const active=num($('#activeCal').value);
+    const intake=num($('#intakeCal').value);
+
+    if(!d || active==null || intake==null){
+      alert('日付・アクティブ消費カロリー・摂取カロリーを入力してください。');
+      return;
+    }
+
+    const key=currentFamilyKey();
+    if(!calorieData[key]) calorieData[key]={};
+
+    calorieData[key][d]={active,intake}; caloriePage=0;
+    saveCalorieStore();
+    clearCalorieDraft();
+
+    // まず保存直後の一覧を同期的に更新する
+    renderCalorieTable();
+
+    // 続いて予測値を同期的に再計算する
+    renderCalorieForecast();
+
+    $('#activeCal').value='';
+    $('#intakeCal').value='';
+    if($('#saveCalorieButton')) $('#saveCalorieButton').textContent='保存';
+    $('#status').textContent=`${d} のカロリー収支を保存しました。`;
+
+    // 視覚的に保存済みであることを明示
+    const btn=$('#saveCalorieButton');
+    if(btn){
+      const oldText=btn.textContent;
+      btn.textContent='保存しました';
+      btn.disabled=true;
+      setTimeout(()=>{
+        btn.textContent=oldText;
+        btn.disabled=false;
+      },700);
+    }
+  }
+  function totalBalance(days){
+    const entries=familyCalories(),keys=Object.keys(entries).sort();
+    if(!keys.length)return null;
+    const bmr=latestBmr(); if(bmr==null)return null;
+    const last=new Date(keys[keys.length-1]+'T12:00:00');
+    const start=new Date(last); start.setDate(start.getDate()-(days-1));
+    const vals=keys.filter(k=>{const d=new Date(k+'T12:00:00');return d>=start&&d<=last;})
+      .map(k=>{const e=entries[k]; if(!Number.isFinite(e.intake)||!Number.isFinite(e.active))return null; return e.intake-(bmr+e.active);})
+      .filter(v=>v!=null);
+    return vals.length?vals.reduce((a,b)=>a+b,0):null;
+  }
+
+  function averageBalance(days){
+    const entries=familyCalories(),keys=Object.keys(entries).sort(); if(!keys.length)return null;
+    const bmr=latestBmr(); if(bmr==null)return null;
+    const last=new Date(keys[keys.length-1]+'T12:00:00'),start=new Date(last);start.setDate(start.getDate()-(days-1));
+    const vals=keys.filter(k=>{const d=new Date(k+'T12:00:00');return d>=start&&d<=last;}).map(k=>entries[k].intake-(bmr+entries[k].active));
+    return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+  }
+  function prediction(days,balance){
+    if(balance==null)return null;
+    const famRows=(typeof getFamilyRows==='function')?getFamilyRows():allRows;
+    const dr=(typeof dailyAverageRows==='function')?dailyAverageRows(famRows):famRows;
+    if(!dr.length)return null;
+    const latest=dr[dr.length-1],w=latest[cols.weight],fp=latest[cols.fat];let fm=latest[cols.fatMass];
+    if(w==null)return null;if(fm==null&&fp!=null)fm=w*(fp/100);
+    const deltaKg=balance*days/7700,pw=Math.max(0,w+deltaKg);
+    let pfm=null,pfp=null;if(fm!=null){pfm=Math.max(0,fm+deltaKg*0.75);pfp=pw>0?pfm/pw*100:null;}
+    return {w:pw,fm:pfm,fp:pfp};
+  }
+  function editCalorieEntry(dateKey){
+    const entries=familyCalories();
+    const e=entries[dateKey];
+    if(!e) return;
+
+    $('#calDate').value=dateKey;
+    $('#activeCal').value=Number.isFinite(e.active)?e.active:'';
+    $('#intakeCal').value=Number.isFinite(e.intake)?e.intake:'';
+
+    // 入力欄までスクロールして、修正中であることを分かりやすくする
+    const saveBtn=$('#saveCalorieButton');
+    if(saveBtn) saveBtn.textContent='修正を保存';
+
+    if($('#status')) $('#status').textContent=`${dateKey} の入力内容を編集中です。修正後に「修正を保存」を押してください。`;
+
+    const target=$('#calDate');
+    if(target && target.scrollIntoView){
+      target.scrollIntoView({behavior:'smooth',block:'center'});
+    }
+  }
+
+  function deleteCalorieEntry(dateKey){
+    const key=currentFamilyKey();
+    if(!calorieData[key] || !calorieData[key][dateKey]) return;
+    if(!confirm(`${dateKey} のカロリー入力を削除しますか？`)) return;
+    delete calorieData[key][dateKey]; caloriePage=0;
+    saveCalorieStore();
+    renderCalorieTable();
+    renderCalorieForecast();
+  }
+
+  function renderCalorieTable(){
+    if(!$('#calorieRows')) return;
+
+    const entries=familyCalories();
+    const bmr=latestBmr();
+    const allKeys=Object.keys(entries).sort().reverse();
+    const totalPages=Math.max(1,Math.ceil(allKeys.length/CALORIE_PAGE_SIZE));
+    caloriePage=Math.min(Math.max(caloriePage,0),totalPages-1);
+
+    const start=caloriePage*CALORIE_PAGE_SIZE;
+    const keys=allKeys.slice(start,start+CALORIE_PAGE_SIZE);
+
+    $('#calorieRows').innerHTML=keys.map(k=>{
+      const e=entries[k];
+      const total=bmr==null?null:bmr+e.active;
+      const bal=total==null?null:e.intake-total;
+      return `<tr>
+        <td>${k}</td>
+        <td>${Math.round(e.active)} kcal</td>
+        <td>${Math.round(e.intake)} kcal</td>
+        <td>${total==null?'-':Math.round(total)+' kcal'}</td>
+        <td>${bal==null?'-':(bal>0?'+':'')+Math.round(bal)+' kcal'}</td>
+        <td><button type="button" class="edit-cal-btn" data-cal-edit="${k}">編集</button><button type="button" class="delete-cal-btn" data-cal-delete="${k}">削除</button></td>
+      </tr>`;
+    }).join('');
+
+    document.querySelectorAll('[data-cal-edit]').forEach(btn=>{
+      btn.addEventListener('click',()=>editCalorieEntry(btn.dataset.calEdit));
+    });
+
+    document.querySelectorAll('[data-cal-delete]').forEach(btn=>{
+      btn.addEventListener('click',()=>deleteCalorieEntry(btn.dataset.calDelete));
+    });
+
+    const prev=$('#caloriePrevButton'), next=$('#calorieNextButton'), info=$('#caloriePagerInfo');
+    if(prev) prev.disabled=(caloriePage>=totalPages-1 || allKeys.length<=CALORIE_PAGE_SIZE);
+    if(next) next.disabled=(caloriePage<=0 || allKeys.length<=CALORIE_PAGE_SIZE);
+    if(info){
+      if(!allKeys.length) info.textContent='データなし';
+      else info.textContent=`${start+1}〜${Math.min(start+CALORIE_PAGE_SIZE,allKeys.length)}件目 / 全${allKeys.length}件`;
+    }
+  }
+
+  function renderCalorieForecast(){
+    const b7=averageBalance(7);
+    const b30=averageBalance(30);
+    const s7=totalBalance(7);
+    const s30=totalBalance(30);
+    const p7=prediction(7,b7);
+    const p30=prediction(30,b30);
+
+    $('#bal7').textContent=b7==null?'-':`${b7>0?'+':''}${Math.round(b7)} kcal/日`;
+    $('#bal30').textContent=b30==null?'-':`${b30>0?'+':''}${Math.round(b30)} kcal/日`;
+    $('#sumBal7').textContent=s7==null?'-':`${s7>0?'+':''}${Math.round(s7)} kcal`;
+    $('#sumBal30').textContent=s30==null?'-':`${s30>0?'+':''}${Math.round(s30)} kcal`;
+
+    $('#predW7').textContent=p7?`${p7.w.toFixed(1)} kg`:'-';
+    $('#predW30').textContent=p30?`${p30.w.toFixed(1)} kg`:'-';
+
+    $('#predF7').textContent=p7&&p7.fp!=null?`${p7.fp.toFixed(1)}%`:'-';
+    $('#predF30').textContent=p30&&p30.fp!=null?`${p30.fp.toFixed(1)}%`:'-';
+
+    $('#predFM7').textContent=p7&&p7.fm!=null?`${p7.fm.toFixed(1)} kg`:'-';
+    $('#predFM30').textContent=p30&&p30.fm!=null?`${p30.fm.toFixed(1)} kg`:'-';
+  }
+
+  function renderCalorie(){
+    renderCalorieTable();
+    renderCalorieForecast();
+  }
+
+  function mapCols(headers){
+    const m={}; for(const [k,list] of Object.entries(aliases)){const f=headers.find(h=>list.some(a=>norm(a)===norm(h)));if(f)m[k]=f} return m;
+  }
+  function dailyAverageRows(rows){
+    if(!rows.length) return rows;
+
+    const groups = new Map();
+
+    rows.forEach(r => {
+      const d = r.__date;
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+      if(!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
+    });
+
+    return [...groups.entries()].map(([key,items]) => {
+      const base = {__date:new Date(`${key}T12:00:00`), __raw:key, __count:items.length};
+
+      for(const k of Object.keys(cols)){
+        if(k==='time') continue;
+        const field = cols[k];
+
+        if(k==='family'){
+          base[field] = items[0][field] ?? '';
+          continue;
+        }
+
+        if(k==='bodyType'){
+          const values = items.map(r=>r[field]).filter(v=>v!==null && v!==undefined && v!=='');
+          base[field] = values.length ? values[values.length-1] : '';
+          continue;
+        }
+
+        const values = items.map(r=>r[field]).filter(v=>typeof v==='number' && Number.isFinite(v));
+        base[field] = values.length ? values.reduce((a,b)=>a+b,0)/values.length : null;
+      }
+
+      // Calculated ratios must be recalculated from the day's averaged values.
+      if(cols.weight && cols.muscle){
+        if(!cols.muscleRate) cols.muscleRate='__calc_muscle_rate';
+        base[cols.muscleRate] = pct(base[cols.muscle], base[cols.weight]);
+      }
+      if(cols.weight && cols.bone){
+        if(!cols.boneRate) cols.boneRate='__calc_bone_rate';
+        base[cols.boneRate] = pct(base[cols.bone], base[cols.weight]);
+      }
+
+      return base;
+    }).sort((a,b)=>a.__date-b.__date);
+  }
+
+  function rangeRows(rows,days){
+    if(days==='all')return rows; const last=rows.at(-1).__date,start=new Date(last);start.setDate(start.getDate()-(Number(days)-1));
+    return rows.filter(r=>r.__date>=start&&r.__date<=last);
+  }
+  function setKpi(vId,cId,cur,prev,u=''){
+    $(vId).textContent=fmt(cur,u); $(cId).textContent=(cur==null||prev==null)?'前回比 -':`前回比 ${cur-prev>0?'+':''}${(cur-prev).toFixed(1)}${u}`;
+  }
+  function line(id,labels,sets,yTitle=''){
+    if(charts[id])charts[id].destroy();
+    const dark=document.body.classList.contains('dark');
+    const axisColor=dark?'#cbd7e6':'#5b6472';
+    const gridColor=dark?'rgba(148,163,184,.18)':'#edf2f7';
+    const tooltipBg=dark?'rgba(5,12,24,.97)':'rgba(24,36,58,.92)';
+    const tooltipText=dark?'#f8fbff':'#ffffff';
+    charts[id]=new Chart(document.getElementById(id),{
+      type:'line',
+      data:{labels,datasets:sets.map(s=>({
+        label:s.label,data:s.data,borderColor:s.color,backgroundColor:s.color,borderWidth:s.width||2.5,borderDash:s.dash||[],pointRadius:3,pointHoverRadius:5,tension:.28,spanGaps:true
+      }))},
+      options:{
+        responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{display:sets.length>1,position:'bottom',labels:{color:axisColor,usePointStyle:true,boxWidth:8}},
+          tooltip:{backgroundColor:tooltipBg,titleColor:tooltipText,bodyColor:tooltipText,borderColor:dark?'#425775':'rgba(0,0,0,0)',borderWidth:dark?1:0,padding:12,cornerRadius:12}
+        },
+        scales:{
+          x:{grid:{display:false},ticks:{maxRotation:0,maxTicksLimit:8,color:axisColor},border:{color:gridColor}},
+          y:{beginAtZero:false,grid:{color:gridColor},ticks:{color:axisColor},border:{color:gridColor},title:{display:!!yTitle,text:yTitle,color:axisColor}}
+        }
+      }
+    });
+  }
+  function averages(){
+    const base=familyRows();
+    if(!base.length)return;
+    const r7=rangeRows(base,'7'),r30=rangeRows(base,'30');
+    $('#w7').textContent=fmt(avg(r7.map(r=>r[cols.weight])),' kg'); $('#f7').textContent=fmt(avg(r7.map(r=>r[cols.fat])),'%'); $('#m7').textContent=fmt(avg(r7.map(r=>r[cols.muscle])),' kg');
+    $('#w30').textContent=fmt(avg(r30.map(r=>r[cols.weight])),' kg'); $('#f30').textContent=fmt(avg(r30.map(r=>r[cols.fat])),'%'); $('#m30').textContent=fmt(avg(r30.map(r=>r[cols.muscle])),' kg');
+  }
+  function insight(rows){
+    if(rows.length<2)return;
+    const a=rows[0],b=rows.at(-1),dw=(b[cols.weight]??0)-(a[cols.weight]??0),dm=(b[cols.muscle]??0)-(a[cols.muscle]??0),badge=$('#muscleBadge');
+    if(dw<0&&dm>=0){badge.className='badge good';badge.textContent='良好';$('#muscleText').textContent=`体重は ${Math.abs(dw).toFixed(1)}kg 減少し、筋肉量は維持または増加しています。`}
+    else if(dw<0&&dm<0){badge.className='badge bad';badge.textContent='要注意';$('#muscleText').textContent=`体重は ${Math.abs(dw).toFixed(1)}kg 減少していますが、筋肉量も ${Math.abs(dm).toFixed(1)}kg 減少しています。`}
+    else{badge.className='badge warn';badge.textContent='経過観察';$('#muscleText').textContent='体重と筋肉量の推移を継続して確認してください。'}
+  }
+  function goalSummary(latest){
+    const gw=num($('#goalWeight').value),gf=num($('#goalFat').value),parts=[];
+    if(gw!=null&&latest[cols.weight]!=null){const d=latest[cols.weight]-gw;parts.push(d>0?`目標体重まであと ${d.toFixed(1)}kg`:`目標体重を ${Math.abs(d).toFixed(1)}kg 下回っています`)}
+    if(gf!=null&&latest[cols.fat]!=null){const d=latest[cols.fat]-gf;parts.push(d>0?`目標体脂肪率まであと ${d.toFixed(1)}ポイント`:`目標体脂肪率を ${Math.abs(d).toFixed(1)}ポイント下回っています`)}
+    $('#goalText').textContent=parts.length?parts.join('。')+'。':'目標体重・目標体脂肪率を入力すると差を表示します。';
+  }
+  function render(){
+    if(!allRows.length)return; const base=familyRows(); if(!base.length)return; const dailyRows=dailyAverageRows(base); const rows=rangeRows(dailyRows,currentRange),last=rows.at(-1),prev=rows.length>1?rows.at(-2):null;
+    setKpi('#kpiWeight','#chgWeight',last[cols.weight],prev?.[cols.weight],' kg');setKpi('#kpiBMI','#chgBMI',last[cols.bmi],prev?.[cols.bmi]);
+    setKpi('#kpiFat','#chgFat',last[cols.fat],prev?.[cols.fat],'%');setKpi('#kpiMuscle','#chgMuscle',last[cols.muscle],prev?.[cols.muscle],' kg');setKpi('#kpiSkeletal','#chgSkeletal',last[cols.skeletal],prev?.[cols.skeletal],' kg');
+    $('#dWater').textContent=fmt(last[cols.water],'%'); $('#dFatMass').textContent=fmt(last[cols.fatMass],' kg');
+    $('#dLean').textContent=fmt(last[cols.lean],' kg'); $('#dBone').textContent=fmt(last[cols.bone],' kg');
+    $('#dProtein').textContent=fmt(last[cols.protein],'%'); $('#dSubfat').textContent=fmt(last[cols.subfat],'%');
+    $('#dBodyAge').textContent=last[cols.bodyAge]==null?'-':`${last[cols.bodyAge].toFixed(0)}歳`;
+    $('#dBodyType').textContent=last[cols.bodyType]||'-';
+    $('#dMuscleRate').textContent=fmt(last[cols.muscleRate],'%'); $('#dBoneRate').textContent=fmt(last[cols.boneRate],'%');
+    averages(); insight(rows); goalSummary(last);
+    const labels=rows.map(r=>label(r.__date)),gw=num($('#goalWeight').value),gf=num($('#goalFat').value);
+    line('weightChart',labels,[
+      {label:'体重',data:rows.map(r=>r[cols.weight]),color:'#3b82f6'},
+      {label:'除脂肪体重',data:rows.map(r=>r[cols.lean]),color:'#10b981'},
+      ...(gw!=null?[{label:'目標体重',data:rows.map(()=>gw),color:'#f59e0b',dash:[7,5],width:2}]:[])
+    ],'kg');
+    line('fatChart',labels,[{label:'体脂肪率',data:rows.map(r=>r[cols.fat]),color:'#ef4444'},...(gf!=null?[{label:'目標体脂肪率',data:rows.map(()=>gf),color:'#f59e0b',dash:[7,5],width:2}]:[])],'%');
+    line('bmiChart',labels,[{label:'BMI',data:rows.map(r=>r[cols.bmi]),color:'#8b5cf6'}],'BMI');
+    line('muscleChart',labels,[{label:'筋肉量',data:rows.map(r=>r[cols.muscle]),color:'#10b981'},{label:'骨格筋量',data:rows.map(r=>r[cols.skeletal]),color:'#14b8a6'}],'kg');
+    line('bmrChart',labels,[{label:'基礎代謝量',data:rows.map(r=>r[cols.bmr]),color:'#6366f1'}],'kcal');
+    line('visceralChart',labels,[{label:'内臓脂肪',data:rows.map(r=>r[cols.visceral]),color:'#ec4899'}],'レベル');
+    line('compositionChart',labels,[
+      {label:'水分量',data:rows.map(r=>r[cols.water]),color:'#0ea5e9'},
+      {label:'タンパク質',data:rows.map(r=>r[cols.protein]),color:'#8b5cf6'}
+    ],'%');
+    line('fatMassChart',labels,[
+      {label:'皮下脂肪',data:rows.map(r=>r[cols.subfat]),color:'#f97316'},
+      {label:'体脂肪量',data:rows.map(r=>r[cols.fatMass]),color:'#ef4444'}
+    ]);
+    line('ageChart',labels,[{label:'体内年齢',data:rows.map(r=>r[cols.bodyAge]),color:'#7c3aed'}],'歳');
+    $('#rows').innerHTML=[...rows].reverse().map(r=>`<tr>
+      <td>${r.__raw}${r.__count>1?`（${r.__count}回平均）`:''}</td><td>${r[cols.family]??''}</td><td>${fmt(r[cols.weight])}</td><td>${fmt(r[cols.bmi])}</td>
+      <td>${fmt(r[cols.fat],'%')}</td><td>${fmt(r[cols.muscle])}</td><td>${fmt(r[cols.muscleRate],'%')}</td><td>${r[cols.bmr]??''}</td>
+      <td>${fmt(r[cols.water],'%')}</td><td>${fmt(r[cols.fatMass])}</td><td>${fmt(r[cols.lean])}</td>
+      <td>${fmt(r[cols.bone])}</td><td>${fmt(r[cols.boneRate],'%')}</td><td>${fmt(r[cols.visceral])}</td>
+      <td>${fmt(r[cols.protein],'%')}</td><td>${fmt(r[cols.skeletal])}</td><td>${fmt(r[cols.subfat],'%')}</td>
+      <td>${r[cols.bodyAge]==null?'':r[cols.bodyAge].toFixed(0)}</td><td>${r[cols.bodyType]??''}</td>
+    </tr>`).join('');
+    renderCalorie();
+    $('#dashboard').style.display='block';$('#empty').style.display='none';$('#status').textContent=`全${allRows.length}件・${currentFamily||'本人'} ${base.length}件・現在${rows.length}件表示中`;
+  }
+  function load(file){
+    if(!file)return;$('#fileName').textContent=file.name;$('#status').textContent='読み込み中...';
+    Papa.parse(file,{header:true,skipEmptyLines:true,complete:res=>{try{
+      cols=mapCols(res.meta.fields||[]); if(!cols.time)throw new Error('日時列を確認できません。');
+      allRows=res.data.map(x=>{const d=date(x[cols.time]);if(!d)return null;const r={__date:d,__raw:x[cols.time]};for(const k of Object.keys(cols)){
+        if(k==='time') continue;
+        if(k==='family'||k==='bodyType') r[cols[k]]=x[cols[k]]??'';
+        else r[cols[k]]=num(x[cols[k]]);
+      }
+      if(cols.weight && cols.muscle){
+        if(!cols.muscleRate) cols.muscleRate='__calc_muscle_rate';
+        r[cols.muscleRate]=pct(r[cols.muscle],r[cols.weight]);
+      }
+      if(cols.weight && cols.bone){
+        if(!cols.boneRate) cols.boneRate='__calc_bone_rate';
+        r[cols.boneRate]=pct(r[cols.bone],r[cols.weight]);
+      }
+      return r}).filter(Boolean).sort((a,b)=>a.__date-b.__date);
+      if(!allRows.length)throw new Error('有効な測定データがありません。');localStorage.setItem(SAVED_FILE_KEY,file.name);saveMeasurementData();updateFamilySwitcher();render();
+    }catch(e){$('#status').textContent='エラー: '+e.message}},error:e=>$('#status').textContent='読み込みエラー: '+e.message});
+  }
+
+  $('#clearSavedButton').addEventListener('click',()=>{
+    if(confirm('端末内に保存した測定データを削除しますか？\\n目標体重・目標体脂肪率は削除しません。')){
+      clearSavedData();
+    }
+  });
+  // 起動時はカロリー収支を先に復元してからダッシュボードを描画する。
+  loadCalorieStore();
+  restoreMeasurementData();
+
+  if($('#calDate')) $('#calDate').value=new Date().toISOString().slice(0,10);
+  restoreCalorieDraft();
+
+  // 初回表示でもカロリー収支欄を確実に更新。
+  if(allRows.length){
+    renderCalorie();
+  }
+  ['calDate','activeCal','intakeCal'].forEach(id=>{const el=$('#'+id);if(el){el.addEventListener('input',saveCalorieDraft);el.addEventListener('change',saveCalorieDraft);}});
+  if($('#saveCalorieButton')) $('#saveCalorieButton').addEventListener('click',saveCalorieEntry);
+
+
+  if($('#exportBackupButton')) $('#exportBackupButton').addEventListener('click',exportBackup);
+  if($('#importBackupButton')) $('#importBackupButton').addEventListener('click',()=>$('#backupFileInput').click());
+  if($('#backupFileInput')) $('#backupFileInput').addEventListener('change',e=>{
+    importBackupFile(e.target.files[0]);
+    e.target.value='';
+  });
+
+  let deferredPrompt=null;
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$('#installButton').style.display='block'});
+  $('#installButton').addEventListener('click',async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('#installButton').style.display='none'});
+  if('serviceWorker' in navigator){window.addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'});await reg.update();let refreshing=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(refreshing)return;refreshing=true;location.reload()})}catch(e){}})}
+})();
+</script>
+</body>
+</html>
